@@ -13,6 +13,8 @@
 # - plugins/sluice-dns (ours) is compiled next to charon.c and linked into the
 #   charon executable only; no autotools needed. It registers itself like the
 #   built-in plugins and is appended to charon's default load list.
+# - -Wl,-dead_strip drops unreferenced code from the static libraries; plugin
+#   constructors (__mod_init_func) and what they reference are kept.
 source "$(dirname "$0")/common.sh"
 
 NAME="strongswan-$STRONGSWAN_VERSION"
@@ -54,7 +56,7 @@ for arch in $ARCHS; do
       CC="clang $flags" \
       PKG_CONFIG="$ROOT/scripts/pkg-config-stub" \
       CFLAGS="-O2 -I$OPENSSL/include" \
-      LDFLAGS="$flags -L$OPENSSL/lib" \
+      LDFLAGS="$flags -L$OPENSSL/lib -Wl,-dead_strip" \
       --prefix=/var/empty \
       --sysconfdir=/var/empty \
       --with-strongswan-conf=/var/empty/strongswan.conf \

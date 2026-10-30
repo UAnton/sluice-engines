@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Assemble the shippable engines into dist/ from the universal builds:
 #
-#   dist/bin/{charon,swanctl,openfortivpn}
+#   dist/bin/{charon,swanctl,openfortivpn}   stripped; the unstripped builds in
+#                                            build/<engine>/universal share their
+#                                            UUIDs (listed in BUILDINFO) for
+#                                            symbolicating crash reports
 #   dist/licenses/          upstream license texts (+ our plugin's license)
 #   dist/BUILDINFO          what was built, from what, with which toolchain
 #   dist/SHA256SUMS         hashes of everything above (shasum -a 256 -c)
@@ -29,6 +32,7 @@ rm -rf "$DIST"
 mkdir -p "$DIST/bin" "$DIST/licenses"
 for b in "${BINS[@]}"; do
   cp "$b" "$DIST/bin/"
+  strip "$DIST/bin/$(basename "$b")"
   check_macho "$DIST/bin/$(basename "$b")"
   check_deps "$DIST/bin/$(basename "$b")"
   check_no_build_paths "$DIST/bin/$(basename "$b")"
@@ -108,6 +112,11 @@ src_line() { printf '  %-13s %-8s sha256 %s\n                %s\n' "$1" "$2" "$3
   for b in "$DIST"/bin/*; do
     printf '  %-13s %s  %s bytes  sha256 %s\n' "$(basename "$b")" \
       "$(lipo -archs "$b")" "$(stat -f %z "$b")" "$(sha "$b")"
+  done
+  echo
+  echo "symbols (bin/ is stripped; unstripped builds with the same UUIDs stay in build/)"
+  for b in "${BINS[@]}"; do
+    printf '  %-13s %s\n' "$(basename "$b")" "$(dwarfdump --uuid "$b" | awk '{printf "%s %s  ", $3, $2}')"
   done
   echo
   echo "charon plugins"

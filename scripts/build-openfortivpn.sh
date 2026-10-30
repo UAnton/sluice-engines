@@ -50,7 +50,7 @@ for arch in $ARCHS; do
     ./configure \
       --build="$build_triple" --host="$(host_triple "$arch")" \
       CC="clang $flags" \
-      LDFLAGS="$flags" \
+      LDFLAGS="$flags -Wl,-dead_strip" \
       PKG_CONFIG="$ROOT/scripts/pkg-config-stub" \
       OPENSSL_CFLAGS="-I$OPENSSL/include" \
       OPENSSL_LIBS="$OPENSSL/lib/libssl.a $OPENSSL/lib/libcrypto.a" \
