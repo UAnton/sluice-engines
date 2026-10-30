@@ -94,8 +94,3 @@ sudo scripts/smoke-charon.sh --bin build/signed
   + OpenSSL 3 Apache-2.0) and `openfortivpn` (GPL-3.0 + OpenSSL 3) are distributed
   under the terms of **GPL-3.0**, the GPL version compatible with Apache-2.0.
   `dist/licenses/NOTICE` says so and points to the exact sources.
-
-## Project docs
-
-- [docs/DECISIONS.md](docs/DECISIONS.md) — build decisions and why
-- [docs/dns-from-gateway.md](docs/dns-from-gateway.md) — how charon publishes gateway DNS (sluice-dns)
