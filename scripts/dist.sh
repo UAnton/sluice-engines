@@ -40,6 +40,25 @@ cp "$STRONGSWAN/$first/src/LICENSE"          "$DIST/licenses/strongswan-LICENSE.
 cp "$OPENFORTIVPN/$first/src/LICENSE"        "$DIST/licenses/openfortivpn-LICENSE.txt"
 cp "$OPENFORTIVPN/$first/src/LICENSE.OpenSSL" "$DIST/licenses/openfortivpn-LICENSE.OpenSSL.txt"
 
+# Combined-work notice next to the license texts.
+cat >"$DIST/licenses/NOTICE" <<NOTICE
+The programs in bin/ are combined works built by sluice-engines:
+
+  charon, swanctl  strongSwan $STRONGSWAN_VERSION (GPL-2.0-or-later, see strongswan-*.txt)
+                   + OpenSSL $OPENSSL_VERSION (Apache-2.0, see openssl-LICENSE.txt)
+                   + sluice-dns plugin in charon (GPL-2.0-or-later)
+  openfortivpn     openfortivpn $OPENFORTIVPN_VERSION (GPL-3.0, see openfortivpn-*.txt)
+                   + OpenSSL $OPENSSL_VERSION (Apache-2.0)
+
+Because OpenSSL 3 is licensed under Apache-2.0, which is compatible with
+GPL-3.0 but not GPL-2.0, these binaries are distributed under the terms of
+the GNU General Public License version 3.
+
+Complete corresponding source: the sluice-engines repository at the commit
+named in ../BUILDINFO (build scripts, the sluice-dns plugin) together with the
+upstream source archives listed there with their sha256 checksums.
+NOTICE
+
 log "dist: BUILDINFO"
 commit="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 if [[ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]]; then

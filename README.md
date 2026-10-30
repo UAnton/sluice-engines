@@ -72,6 +72,17 @@ Outputs:
 
 `sources/`, `build/` and `dist/` are not tracked.
 
+## Licensing
+
+- Build scripts, tests and docs in this repository: [MIT](LICENSE).
+- [`plugins/sluice-dns`](plugins/sluice-dns/): GPL-2.0-or-later ([COPYING](plugins/sluice-dns/COPYING)),
+  because it is linked into strongSwan's charon.
+- Upstream engines keep their licenses; texts ship in `dist/licenses/`.
+- The shipped binaries are combined works: `charon` (strongSwan GPL-2.0-or-later
+  + OpenSSL 3 Apache-2.0) and `openfortivpn` (GPL-3.0 + OpenSSL 3) are distributed
+  under the terms of **GPL-3.0**, the GPL version compatible with Apache-2.0.
+  `dist/licenses/NOTICE` says so and points to the exact sources.
+
 ## Project docs
 
 - [docs/STATUS.md](docs/STATUS.md) — what's done, what's next, open questions
