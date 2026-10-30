@@ -62,6 +62,8 @@ charon {
   filelog {
     log {
       path = $T/charon.log
+      # flush each line so the script can grep the log while charon runs
+      flush_line = yes
       time_format = %T
       default = 1
       ike = 2
