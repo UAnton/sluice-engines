@@ -10,6 +10,9 @@
 # - piddir=/var/run/sluice: own pidfile and default vici socket, so bundled
 #   charon coexists with any other strongSwan. The helper must create the
 #   directory (root:wheel 0755) before starting charon, or charon aborts.
+# - plugins/sluice-dns (ours) is compiled next to charon.c and linked into the
+#   charon executable only; no autotools needed. It registers itself like the
+#   built-in plugins and is appended to charon's default load list.
 source "$(dirname "$0")/common.sh"
 
 NAME="strongswan-$STRONGSWAN_VERSION"
@@ -42,6 +45,7 @@ for arch in $ARCHS; do
   rm -rf "$OUT/$arch"
   mkdir -p "$src"
   tar -xjf "$TARBALL" -C "$src" --strip-components 1
+  cp "$ROOT/plugins/sluice-dns/sluice_dns_plugin.c" "$src/src/charon/"
   (
     cd "$src"
     flags="-arch $arch -mmacosx-version-min=$MACOS_MIN"
@@ -66,7 +70,12 @@ for arch in $ARCHS; do
       >"$OUT/$arch/configure.log" 2>&1 \
       || { tail -30 "$OUT/$arch/configure.log"; die "strongswan $arch: configure failed"; }
     log "strongswan $arch: build"
-    make -j"$JOBS" >"$OUT/$arch/make.log" 2>&1 \
+    charon_plugins="$(sed -n 's/^charon_plugins = *//p' src/charon/Makefile)"
+    [[ -n "$charon_plugins" ]] || die "strongswan $arch: charon_plugins not found"
+    make -j"$JOBS" \
+      am_charon_OBJECTS='charon.$(OBJEXT) sluice_dns_plugin.$(OBJEXT)' \
+      charon_plugins="$charon_plugins sluice-dns" \
+      >"$OUT/$arch/make.log" 2>&1 \
       || { grep -m20 -E 'error|Error' "$OUT/$arch/make.log"; die "strongswan $arch: build failed"; }
     make install DESTDIR="$prefix" >"$OUT/$arch/install.log" 2>&1
   )

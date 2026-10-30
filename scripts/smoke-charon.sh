@@ -8,8 +8,9 @@ source "$(dirname "$0")/common.sh"
 BIN="$BUILD/strongswan/universal/bin"
 [[ -x "$BIN/charon" ]] || die "charon not built: run scripts/build-strongswan.sh"
 
-# Plugins compiled into charon (counters is forced on by vici in configure.ac).
-EXPECTED="constraints counters eap-identity eap-mschapv2 kdf kernel-pfkey kernel-pfroute nonce openssl pem pkcs1 pkcs8 pubkey revocation socket-default vici x509"
+# Plugins compiled into charon (counters is forced on by vici in configure.ac;
+# sluice-dns is ours, plugins/sluice-dns).
+EXPECTED="constraints counters eap-identity eap-mschapv2 kdf kernel-pfkey kernel-pfroute nonce openssl pem pkcs1 pkcs8 pubkey revocation sluice-dns socket-default vici x509"
 
 # charon refuses to start while another one owns the compiled-in pidfile,
 # and aborts if its piddir is missing (in the app, the helper creates it).
@@ -59,6 +60,8 @@ for arch in $ARCHS; do
   [[ "$loaded" == "$EXPECTED " ]] || die "charon $arch: plugins differ
   expected: $EXPECTED
   loaded:   $loaded"
+
+  [[ -d "$CHARON_PIDDIR/dns" ]] || die "charon $arch: sluice-dns did not create $CHARON_PIDDIR/dns"
 
   kill "$pid"; wait "$pid" 2>/dev/null || true
   rm -f "$T/charon.vici"

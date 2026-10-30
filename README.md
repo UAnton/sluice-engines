@@ -34,6 +34,11 @@ Live test against a FortiGate (IKEv2 dial-up, PSK + EAP-MSCHAPv2): copy
 Each build script verifies its output: all architectures present, `minos` 15.0 in
 every object, only system libraries linked, no build-machine paths compiled in.
 
+charon includes one plugin of our own, [`plugins/sluice-dns`](plugins/sluice-dns/sluice_dns_plugin.c)
+(GPL-2.0-or-later): it requests DNS configuration attributes from the gateway and
+publishes them per IKE_SA as files under `/var/run/sluice/dns/` for the host app,
+instead of changing system DNS itself.
+
 All paths compiled into the binaries (config files, plugin and module directories)
 point into `/var/empty`; the host app supplies the real configuration at runtime
 via `STRONGSWAN_CONF`. `pkg-config` is not required (a stub in `scripts/` stands in).

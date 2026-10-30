@@ -149,6 +149,13 @@ echo
 log "config payload exchange"
 grep -E 'CPRQ|CPRP|installing new virtual IP|handling .* attribute|INTERNAL_IP4' "$T/charon.log" \
   | sed -E 's/^[0-9:]+ [0-9]+//' || echo "  (none logged)"
+log "DNS published by sluice-dns ($CHARON_PIDDIR/dns)"
+dns_files=("$CHARON_PIDDIR"/dns/*)
+if [[ -f "${dns_files[0]}" ]]; then
+  for f in "${dns_files[@]}"; do echo "  $(basename "$f"):"; sed 's/^/    /' "$f"; done
+else
+  echo "  (no file: gateway sent no DNS attributes)"
+fi
 log "routes via tunnel"
 netstat -rn -f inet | awk 'NR<=4 || /utun/' | grep -E 'utun|Destination' || true
 log "default route now: $(default_route_if) (before: $if_before)"
@@ -167,5 +174,10 @@ left="$(utun_routes)"
 if [[ "$left" -le "$utun_before" ]]; then log "routes cleaned up"
 else log "warning: $((left - utun_before)) tunnel routes remain"; fi
 log "default route after: $(default_route_if)"
+if compgen -G "$CHARON_PIDDIR/dns/*" >/dev/null; then
+  log "warning: DNS files remain: $(ls "$CHARON_PIDDIR/dns")"
+else
+  log "DNS files removed"
+fi
 show_log
 log "done"
