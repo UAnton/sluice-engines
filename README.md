@@ -33,6 +33,10 @@ Live test against a FortiGate (IKEv2 dial-up, PSK + EAP-MSCHAPv2): copy
 `scripts/connect-test.env.example` outside the repo, fill it in, then
 `sudo scripts/connect-test.sh <env-file> [--arch x86_64] [--hold] [--public-ip]`.
 
+Live test against a FortiGate SSL-VPN with openfortivpn: same idea with
+`scripts/connect-test-sslvpn.env.example` and
+`sudo scripts/connect-test-sslvpn.sh <env-file> [--arch x86_64] [--hold] [--otp]`.
+
 Each build script verifies its output: all architectures present, `minos` 15.0 in
 every object, only system libraries linked, no build-machine paths compiled in.
 
