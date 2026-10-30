@@ -3,11 +3,12 @@
 # the gateway gave us (IP, DNS, routes), then disconnect and check cleanup.
 # DNS is not applied (--set-dns=0), as in the app. Needs sudo (pppd).
 #
-# Usage: sudo scripts/connect-test-sslvpn.sh <env-file> [--arch arm64|x86_64] [--hold] [--otp] [--debug]
+# Usage: sudo scripts/connect-test-sslvpn.sh <env-file> [--arch arm64|x86_64] [--hold] [--otp] [--debug] [--bin DIR]
 #   env-file  credentials, see scripts/connect-test-sslvpn.env.example (keep outside the repo)
 #   --arch    which slice of the universal binary to run (default: this Mac's)
 #   --hold    keep the tunnel up until Enter is pressed
 #   --otp     ask for a one-time password before connecting
+#   --bin     directory with openfortivpn (e.g. build/signed)
 #   --debug   openfortivpn -vv: log the HTTP exchange with the gateway
 #             (password masked by openfortivpn; cookies are not)
 source "$(dirname "$0")/common.sh"
@@ -15,13 +16,14 @@ source "$(dirname "$0")/common.sh"
 [[ $EUID -eq 0 ]] || die "run as root: sudo $0 $*"
 [[ $# -ge 1 && -f "$1" ]] || die "usage: sudo $0 <env-file> [--arch A] [--hold] [--otp] [--debug]"
 ENV_FILE="$1"; shift
-arch="$(uname -m)"; hold=""; otp=""; verbosity=-v
+arch="$(uname -m)"; hold=""; otp=""; verbosity=-v; bin_dir=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch) arch="$2"; shift 2 ;;
     --hold) hold=1; shift ;;
     --otp) otp=1; shift ;;
     --debug) verbosity=-vv; shift ;;
+    --bin) bin_dir="$(cd "$2" && pwd)"; shift 2 ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -44,7 +46,8 @@ for v in GATEWAY USERNAME PASSWORD REALM TRUSTED_CERT USER_AGENT; do
   [[ "${!v}" != *$'\n'* ]] || die "$v must not contain a newline"
 done
 
-BIN="$BUILD/openfortivpn/universal/bin/openfortivpn"
+BIN="${bin_dir:-$BUILD/openfortivpn/universal}/openfortivpn"
+[[ -n "$bin_dir" ]] || BIN="$BUILD/openfortivpn/universal/bin/openfortivpn"
 [[ -x "$BIN" ]] || die "openfortivpn not built: run scripts/build-openfortivpn.sh"
 if pgrep -x openfortivpn >/dev/null; then
   die "another openfortivpn is running; stop it first"

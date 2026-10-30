@@ -3,22 +3,24 @@
 # the gateway gave us (virtual IP, routes, DNS), then disconnect and check
 # cleanup. Mirrors a configuration verified against a FortiGate. Needs sudo.
 #
-# Usage: sudo scripts/connect-test.sh <env-file> [--arch arm64|x86_64] [--hold] [--public-ip]
+# Usage: sudo scripts/connect-test.sh <env-file> [--arch arm64|x86_64] [--hold] [--public-ip] [--bin DIR]
 #   env-file     credentials, see scripts/connect-test.env.example (keep outside the repo)
 #   --arch       which slice of the universal charon to run (default: this Mac's)
 #   --hold       keep the tunnel up until Enter is pressed
 #   --public-ip  compare public IP before/after via ifconfig.me (third-party request)
+#   --bin        directory with charon and swanctl (e.g. build/signed)
 source "$(dirname "$0")/common.sh"
 
 [[ $EUID -eq 0 ]] || die "run as root: sudo $0 $*"
 [[ $# -ge 1 && -f "$1" ]] || die "usage: sudo $0 <env-file> [--arch A] [--hold] [--public-ip]"
 ENV_FILE="$1"; shift
-arch="$(uname -m)"; hold=""; public_ip=""
+arch="$(uname -m)"; hold=""; public_ip=""; bin_dir=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch) arch="$2"; shift 2 ;;
     --hold) hold=1; shift ;;
     --public-ip) public_ip=1; shift ;;
+    --bin) bin_dir="$(cd "$2" && pwd)"; shift 2 ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -32,7 +34,7 @@ for v in GATEWAY PSK EAP_ID EAP_PASSWORD; do [[ -n "${!v}" ]] || die "$v not set
 [[ "$GATEWAY" != vpn.example.com && "$PSK" != ... && "$EAP_PASSWORD" != ... ]] \
   || die "$ENV_FILE still has example values: fill in GATEWAY, PSK, EAP_ID, EAP_PASSWORD"
 
-BIN="$BUILD/strongswan/universal/bin"
+BIN="${bin_dir:-$BUILD/strongswan/universal/bin}"
 [[ -x "$BIN/charon" ]] || die "charon not built: run scripts/build-strongswan.sh"
 PIDFILE="$CHARON_PIDDIR/charon.pid"
 if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then

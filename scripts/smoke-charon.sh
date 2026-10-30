@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Start the built charon as root with a throwaway config, check via vici that
 # exactly the expected plugins are loaded, then stop it. Needs sudo.
-# Usage: sudo scripts/smoke-charon.sh
+# Usage: sudo scripts/smoke-charon.sh [--bin DIR]
+#   --bin  directory with charon and swanctl (default: the universal build;
+#          e.g. build/signed from scripts/sign-check.sh)
 source "$(dirname "$0")/common.sh"
 
 [[ $EUID -eq 0 ]] || die "run as root: sudo $0"
 BIN="$BUILD/strongswan/universal/bin"
+[[ "${1:-}" == --bin && -n "${2:-}" ]] && BIN="$(cd "$2" && pwd)"
 [[ -x "$BIN/charon" ]] || die "charon not built: run scripts/build-strongswan.sh"
 
 # Plugins compiled into charon (counters is forced on by vici in configure.ac;

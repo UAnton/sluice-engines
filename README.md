@@ -72,6 +72,18 @@ Outputs:
 
 `sources/`, `build/` and `dist/` are not tracked.
 
+## Signing check
+
+The app signs the engines it bundles. To check they survive that, sign copies
+the same way (hardened runtime, secure timestamp) and run the live tests on them:
+
+```sh
+scripts/sign-check.sh "Developer ID Application: Name (TEAMID)"   # or no argument: ad-hoc
+sudo scripts/smoke-charon.sh --bin build/signed
+```
+
+`connect-test.sh` and `connect-test-sslvpn.sh` take the same `--bin` option.
+
 ## Licensing
 
 - Build scripts, tests and docs in this repository: [MIT](LICENSE).
