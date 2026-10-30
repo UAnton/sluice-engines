@@ -85,9 +85,4 @@ check_macho "$uni/bin/openfortivpn"
 check_deps "$uni/bin/openfortivpn"
 check_no_build_paths "$uni/bin/openfortivpn"
 
-mkdir -p "$DIST/licenses"
-first="${ARCHS%% *}"
-cp "$OUT/$first/src/LICENSE" "$DIST/licenses/openfortivpn-LICENSE.txt"
-cp "$OUT/$first/src/LICENSE.OpenSSL" "$DIST/licenses/openfortivpn-LICENSE.OpenSSL.txt"
-
 log "openfortivpn $OPENFORTIVPN_VERSION: $uni/bin/openfortivpn"

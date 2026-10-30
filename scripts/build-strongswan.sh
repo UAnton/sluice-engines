@@ -93,9 +93,4 @@ for exe in libexec/ipsec/charon sbin/swanctl; do
   check_no_build_paths "$uni/bin/$(basename "$exe")"
 done
 
-mkdir -p "$DIST/licenses"
-first="${ARCHS%% *}"
-cp "$OUT/$first/src/COPYING" "$DIST/licenses/strongswan-COPYING.txt"
-cp "$OUT/$first/src/LICENSE" "$DIST/licenses/strongswan-LICENSE.txt"
-
 log "strongswan $STRONGSWAN_VERSION: $uni/bin ($(ls "$uni/bin" | tr '\n' ' '))"

@@ -21,11 +21,18 @@ with no Homebrew or other runtime dependencies.
 ## Build
 
 ```sh
+scripts/build-all.sh        # everything below, then dist/
+```
+
+Or step by step:
+
+```sh
 scripts/fetch.sh            # download pinned sources, verify sha256
 scripts/build-openssl.sh    # -> build/openssl/universal/{include,lib}
 scripts/build-strongswan.sh # -> build/strongswan/universal/bin/{charon,swanctl}
 scripts/build-tools.sh      # build-only m4/autoconf/automake -> build/tools (needed by the next step)
 scripts/build-openfortivpn.sh # -> build/openfortivpn/universal/bin/openfortivpn
+scripts/dist.sh             # -> dist/
 sudo scripts/smoke-charon.sh  # optional: run charon as root, verify loaded plugins
 ```
 
@@ -57,7 +64,11 @@ sha256 differs from the pinned value aborts the build.
 Outputs:
 - `build/<engine>/<arch>/` — per-architecture source tree and install prefix
 - `build/<engine>/universal/` — merged universal result
+- `dist/bin/` — `charon`, `swanctl`, `openfortivpn`: what the app bundles
 - `dist/licenses/` — upstream license texts that ship next to the binaries
+- `dist/BUILDINFO` — repository commit, build host (macOS, Xcode, SDK, clang),
+  upstream sources with sha256, compiled-in runtime paths, binary hashes
+- `dist/SHA256SUMS` — `cd dist && shasum -a 256 -c SHA256SUMS`
 
 `sources/`, `build/` and `dist/` are not tracked.
 

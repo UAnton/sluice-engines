@@ -68,7 +68,4 @@ for lib in libcrypto.a libssl.a; do
   check_macho "$uni/lib/$lib"
 done
 
-mkdir -p "$DIST/licenses"
-cp "$OUT/$first/src/LICENSE.txt" "$DIST/licenses/openssl-LICENSE.txt"
-
 log "openssl $OPENSSL_VERSION: $uni ($(lipo -archs "$uni/lib/libcrypto.a"))"
