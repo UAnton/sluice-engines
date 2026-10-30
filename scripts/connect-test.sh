@@ -108,7 +108,9 @@ CONF
 chmod 600 "$T/swanctl.conf"
 
 swanctl() { STRONGSWAN_CONF="$T/strongswan.conf" "$BIN/swanctl" "$@"; }
-default_route_if() { route -n get default 2>/dev/null | awk '/interface:/{print $2}'; }
+# Where internet traffic actually goes: a full tunnel installs 0/1 + 128.0/1,
+# leaving the "default" entry on the physical interface.
+default_route_if() { route -n get 1.1.1.1 2>/dev/null | awk '/interface:/{print $2}'; }
 show_log() { log "charon log: $OUTDIR/charon-$arch.log"; }
 
 [[ -n "$public_ip" ]] && log "public IP before: $(curl -s --max-time 5 https://ifconfig.me || echo '?')"
@@ -140,8 +142,11 @@ fi
 echo
 swanctl --list-sas
 echo
-log "gateway attributes (charon cannot apply DNS without a handler; the line proves it was sent)"
-grep -E 'installing new virtual IP|handling .* attribute|INTERNAL_IP4' "$T/charon.log" || echo "  (none logged)"
+# Without an attribute handler charon does not request DNS (CPRQ carries only
+# ADDR), so the gateway sends none. Show what was exchanged.
+log "config payload exchange"
+grep -E 'CPRQ|CPRP|installing new virtual IP|handling .* attribute|INTERNAL_IP4' "$T/charon.log" \
+  | sed -E 's/^[0-9:]+ [0-9]+//' || echo "  (none logged)"
 log "routes via tunnel"
 netstat -rn -f inet | awk 'NR<=4 || /utun/' | grep -E 'utun|Destination' || true
 log "default route now: $(default_route_if) (before: $if_before)"
