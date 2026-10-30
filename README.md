@@ -97,5 +97,5 @@ sudo scripts/smoke-charon.sh --bin build/signed
 
 ## Project docs
 
-- [docs/STATUS.md](docs/STATUS.md) — what's done, what's next, open questions
 - [docs/DECISIONS.md](docs/DECISIONS.md) — build decisions and why
+- [docs/dns-from-gateway.md](docs/dns-from-gateway.md) — how charon publishes gateway DNS (sluice-dns)
