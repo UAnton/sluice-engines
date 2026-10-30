@@ -11,11 +11,14 @@ BIN="$BUILD/strongswan/universal/bin"
 # Plugins compiled into charon (counters is forced on by vici in configure.ac).
 EXPECTED="constraints counters eap-identity eap-mschapv2 kdf kernel-pfkey kernel-pfroute nonce openssl pem pkcs1 pkcs8 pubkey revocation socket-default vici x509"
 
-# charon refuses to start while another one owns the compiled-in pidfile.
-PIDFILE=/var/run/charon.pid
+# charon refuses to start while another one owns the compiled-in pidfile,
+# and aborts if its piddir is missing (in the app, the helper creates it).
+PIDFILE="$CHARON_PIDDIR/charon.pid"
 if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
   die "another charon is running (pid $(cat "$PIDFILE"): $(ps -o comm= -p "$(cat "$PIDFILE")")); stop it first"
 fi
+
+install -d -o root -g wheel -m 0755 "$CHARON_PIDDIR"
 
 T="$(mktemp -d)"
 trap 'kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -rf "$T"' EXIT

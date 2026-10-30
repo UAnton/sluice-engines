@@ -7,6 +7,9 @@
 # - --prefix=/var/empty: every compiled-in path (strongswan.conf, plugindir,
 #   swanctl dir) points into a root-owned empty directory. The app passes the
 #   real config via STRONGSWAN_CONF / swanctl --file.
+# - piddir=/var/run/sluice: own pidfile and default vici socket, so bundled
+#   charon coexists with any other strongSwan. The helper must create the
+#   directory (root:wheel 0755) before starting charon, or charon aborts.
 source "$(dirname "$0")/common.sh"
 
 NAME="strongswan-$STRONGSWAN_VERSION"
@@ -54,6 +57,7 @@ for arch in $ARCHS; do
       --with-swanctldir=/var/empty/swanctl \
       --with-plugindir=/var/empty \
       --with-ipseclibdir=/var/empty \
+      --with-piddir="$CHARON_PIDDIR" \
       --disable-dependency-tracking \
       --enable-static --disable-shared --enable-monolithic \
       --disable-defaults \
