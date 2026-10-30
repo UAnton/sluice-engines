@@ -1,0 +1,7 @@
+#!/bin/sh
+# Stand-in for pkg-config so configure runs without Homebrew. Passes the version
+# probe, reports every module as missing: nothing outside build/ gets linked.
+case "$1" in
+  --atleast-pkgconfig-version|--version) exit 0 ;;
+  *) exit 1 ;;
+esac

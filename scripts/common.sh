@@ -39,3 +39,19 @@ check_macho() {
     [[ "$minos" == "$MACOS_MIN " ]] || die "$f ($a): minos [$minos], expected $MACOS_MIN"
   done
 }
+
+# Assert a binary links only against system libraries (checked per arch).
+check_deps() {
+  local f="$1" bad a
+  for a in $ARCHS; do
+    bad="$(otool -arch "$a" -L "$f" | tail -n +2 | awk '{print $1}' | grep -vE '^(/usr/lib/|/System/Library/)' || true)"
+    [[ -z "$bad" ]] || die "$f ($a): non-system dependencies:
+$bad"
+  done
+}
+
+# Assert no path from the build machine (the repo root) got compiled in.
+check_no_build_paths() {
+  local f="$1"
+  ! strings -a "$f" | grep -qF "$ROOT" || die "$f: contains build path $ROOT"
+}
