@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$(stat -f %Lp "$ENV_FILE")" =~ ^[0-7]00$ ]] || log "warning: $ENV_FILE is readable by others (chmod 600)"
-GATEWAY= PORT=443 USERNAME= PASSWORD= REALM= TRUSTED_CERT=
+GATEWAY= PORT=443 USERNAME= PASSWORD= REALM= TRUSTED_CERT= USER_AGENT=
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 for v in GATEWAY USERNAME PASSWORD; do [[ -n "${!v}" ]] || die "$v not set in $ENV_FILE"; done
@@ -35,7 +35,7 @@ for v in GATEWAY USERNAME PASSWORD; do [[ -n "${!v}" ]] || die "$v not set in $E
 [[ "$GATEWAY" != vpn.example.com && "$PASSWORD" != ... ]] \
   || die "$ENV_FILE still has example values: fill in GATEWAY, USERNAME, PASSWORD"
 # The config file format is one "key = value" per line, no quoting.
-for v in GATEWAY USERNAME PASSWORD REALM TRUSTED_CERT; do
+for v in GATEWAY USERNAME PASSWORD REALM TRUSTED_CERT USER_AGENT; do
   [[ "${!v}" != *$'\n'* ]] || die "$v must not contain a newline"
 done
 
@@ -76,6 +76,7 @@ trap cleanup EXIT
   [[ -n "$REALM" ]] && echo "realm = $REALM"
   [[ -n "$TRUSTED_CERT" ]] && echo "trusted-cert = $TRUSTED_CERT"
   [[ -n "$otp_value" ]] && echo "otp = $otp_value"
+  [[ -n "$USER_AGENT" ]] && echo "user-agent = $USER_AGENT"
   echo "set-dns = 0"
   echo "pppd-use-peerdns = 0"
   echo "set-routes = 1"
