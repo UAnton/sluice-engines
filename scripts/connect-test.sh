@@ -28,6 +28,9 @@ GATEWAY= PSK= EAP_ID= EAP_PASSWORD= REMOTE_TS=0.0.0.0/0
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 for v in GATEWAY PSK EAP_ID EAP_PASSWORD; do [[ -n "${!v}" ]] || die "$v not set in $ENV_FILE"; done
+# Placeholders from connect-test.env.example
+[[ "$GATEWAY" != vpn.example.com && "$PSK" != ... && "$EAP_PASSWORD" != ... ]] \
+  || die "$ENV_FILE still has example values: fill in GATEWAY, PSK, EAP_ID, EAP_PASSWORD"
 
 BIN="$BUILD/strongswan/universal/bin"
 [[ -x "$BIN/charon" ]] || die "charon not built: run scripts/build-strongswan.sh"
