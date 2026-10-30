@@ -3,12 +3,14 @@
 # the gateway gave us (IP, DNS, routes), then disconnect and check cleanup.
 # DNS is not applied (--set-dns=0), as in the app. Needs sudo (pppd).
 #
-# Usage: sudo scripts/connect-test-sslvpn.sh <env-file> [--arch arm64|x86_64] [--hold] [--otp] [--debug] [--bin DIR]
+# Usage: sudo scripts/connect-test-sslvpn.sh <env-file> [--arch arm64|x86_64] [--hold] [--otp] [--debug] [--bin DIR] [--peerdns]
 #   env-file  credentials, see scripts/connect-test-sslvpn.env.example (keep outside the repo)
 #   --arch    which slice of the universal binary to run (default: this Mac's)
 #   --hold    keep the tunnel up until Enter is pressed
 #   --otp     ask for a one-time password before connecting
 #   --bin     directory with openfortivpn (e.g. build/signed)
+#   --peerdns pppd-use-peerdns = 1: also take DNS offered via PPP IPCP
+#             (otherwise only DNS from the gateway's XML config is seen)
 #   --debug   openfortivpn -vv: log the HTTP exchange with the gateway
 #             (password masked by openfortivpn; cookies are not)
 source "$(dirname "$0")/common.sh"
@@ -16,7 +18,7 @@ source "$(dirname "$0")/common.sh"
 [[ $EUID -eq 0 ]] || die "run as root: sudo $0 $*"
 [[ $# -ge 1 && -f "$1" ]] || die "usage: sudo $0 <env-file> [--arch A] [--hold] [--otp] [--debug]"
 ENV_FILE="$1"; shift
-arch="$(uname -m)"; hold=""; otp=""; verbosity=-v; bin_dir=""
+arch="$(uname -m)"; hold=""; otp=""; verbosity=-v; bin_dir=""; peerdns=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch) arch="$2"; shift 2 ;;
@@ -24,6 +26,7 @@ while [[ $# -gt 0 ]]; do
     --otp) otp=1; shift ;;
     --debug) verbosity=-vv; shift ;;
     --bin) bin_dir="$(cd "$2" && pwd)"; shift 2 ;;
+    --peerdns) peerdns=1; shift ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -86,7 +89,7 @@ trap cleanup EXIT
   [[ -n "$otp_value" ]] && echo "otp = $otp_value"
   [[ -n "$USER_AGENT" ]] && echo "user-agent = $USER_AGENT"
   echo "set-dns = 0"
-  echo "pppd-use-peerdns = 0"
+  echo "pppd-use-peerdns = $peerdns"
   echo "set-routes = 1"
 } >"$T/config"
 chmod 600 "$T/config"
@@ -96,6 +99,9 @@ ppp_ifaces() { ifconfig -l | tr ' ' '\n' | grep '^ppp' | sort || true; }
 if_before="$(default_route_if)"
 ppp_before="$(ppp_ifaces)"
 resolv_before="$(shasum -a 256 /etc/resolv.conf 2>/dev/null | cut -d' ' -f1)"
+# System resolver config, minus volatile reach/flags lines.
+dns_state() { scutil --dns | grep -E 'nameserver\[|search domain|domain   ' | sort; }
+dns_before="$(dns_state)"
 log "default route before: $if_before"
 
 log "start openfortivpn ($arch)"
@@ -138,6 +144,12 @@ if [[ "$(shasum -a 256 /etc/resolv.conf 2>/dev/null | cut -d' ' -f1)" == "$resol
   log "/etc/resolv.conf untouched (set-dns = 0)"
 else
   log "warning: /etc/resolv.conf changed"
+fi
+if [[ "$(dns_state)" == "$dns_before" ]]; then
+  log "system DNS (scutil --dns) untouched"
+else
+  log "warning: system DNS changed (pppd-use-peerdns = $peerdns):"
+  diff <(echo "$dns_before") <(dns_state) | sed 's/^/  /' || true
 fi
 
 if [[ -n "$hold" ]]; then
