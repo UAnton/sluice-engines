@@ -3,22 +3,25 @@
 # the gateway gave us (IP, DNS, routes), then disconnect and check cleanup.
 # DNS is not applied (--set-dns=0), as in the app. Needs sudo (pppd).
 #
-# Usage: sudo scripts/connect-test-sslvpn.sh <env-file> [--arch arm64|x86_64] [--hold] [--otp]
+# Usage: sudo scripts/connect-test-sslvpn.sh <env-file> [--arch arm64|x86_64] [--hold] [--otp] [--debug]
 #   env-file  credentials, see scripts/connect-test-sslvpn.env.example (keep outside the repo)
 #   --arch    which slice of the universal binary to run (default: this Mac's)
 #   --hold    keep the tunnel up until Enter is pressed
 #   --otp     ask for a one-time password before connecting
+#   --debug   openfortivpn -vv: log the HTTP exchange with the gateway
+#             (password masked by openfortivpn; cookies are not)
 source "$(dirname "$0")/common.sh"
 
 [[ $EUID -eq 0 ]] || die "run as root: sudo $0 $*"
-[[ $# -ge 1 && -f "$1" ]] || die "usage: sudo $0 <env-file> [--arch A] [--hold] [--otp]"
+[[ $# -ge 1 && -f "$1" ]] || die "usage: sudo $0 <env-file> [--arch A] [--hold] [--otp] [--debug]"
 ENV_FILE="$1"; shift
-arch="$(uname -m)"; hold=""; otp=""
+arch="$(uname -m)"; hold=""; otp=""; verbosity=-v
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch) arch="$2"; shift 2 ;;
     --hold) hold=1; shift ;;
     --otp) otp=1; shift ;;
+    --debug) verbosity=-vv; shift ;;
     *) die "unknown option $1" ;;
   esac
 done
@@ -87,7 +90,7 @@ resolv_before="$(shasum -a 256 /etc/resolv.conf 2>/dev/null | cut -d' ' -f1)"
 log "default route before: $if_before"
 
 log "start openfortivpn ($arch)"
-arch -"$arch" "$BIN" -c "$T/config" -v >"$LOG" 2>&1 &
+arch -"$arch" "$BIN" -c "$T/config" "$verbosity" >"$LOG" 2>&1 &
 pid=$!
 
 # Wait for the tunnel, a failure, or 60 s.
