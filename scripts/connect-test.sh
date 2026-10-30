@@ -56,9 +56,19 @@ b64() { printf '%s' "$1" | base64; }
 PROPOSALS="aes256-sha256-ecp384, aes128-sha256-ecp384"
 cat >"$T/strongswan.conf" <<CONF
 charon {
-  filelog { log { path = $T/charon.log; time_format = %T; default = 1; ike = 2; cfg = 2; knl = 1 } }
+  filelog {
+    log {
+      path = $T/charon.log
+      time_format = %T
+      default = 1
+      ike = 2
+      cfg = 2
+      knl = 1
+    }
+  }
 }
 CONF
+# strongSwan config syntax: one setting per line; ';' is NOT a separator.
 cat >"$T/swanctl.conf" <<CONF
 connections {
   fortigate {
@@ -66,8 +76,14 @@ connections {
     remote_addrs = $(quote "$GATEWAY")
     proposals = $PROPOSALS
     vips = 0.0.0.0
-    local { auth = eap; eap_id = $(quote "$EAP_ID") }
-    remote { auth = psk; id = %any }
+    local {
+      auth = eap
+      eap_id = $(quote "$EAP_ID")
+    }
+    remote {
+      auth = psk
+      id = %any
+    }
     children {
       fortigate {
         remote_ts = $REMOTE_TS
@@ -77,8 +93,13 @@ connections {
   }
 }
 secrets {
-  ike-gw { secret = 0s$(b64 "$PSK") }
-  eap-user { id = $(quote "$EAP_ID"); secret = 0s$(b64 "$EAP_PASSWORD") }
+  ike-gw {
+    secret = 0s$(b64 "$PSK")
+  }
+  eap-user {
+    id = $(quote "$EAP_ID")
+    secret = 0s$(b64 "$EAP_PASSWORD")
+  }
 }
 CONF
 chmod 600 "$T/swanctl.conf"
@@ -103,6 +124,9 @@ for _ in $(seq 100); do
 done
 
 log "load config"
+# swanctl also scans x509/, private/ etc. next to the file; create them to
+# keep the output clean.
+mkdir -p "$T"/{x509,x509ca,x509ocsp,x509aa,x509ac,x509crl,pubkey,private,rsa,ecdsa,pkcs8,pkcs12}
 swanctl --load-all --file "$T/swanctl.conf"
 
 log "initiate"

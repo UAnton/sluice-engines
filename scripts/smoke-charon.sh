@@ -24,7 +24,12 @@ T="$(mktemp -d)"
 trap 'kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -rf "$T"' EXIT
 cat >"$T/strongswan.conf" <<CONF
 charon {
-  filelog { log { path = $T/charon.log; default = 1 } }
+  filelog {
+    log {
+      path = $T/charon.log
+      default = 1
+    }
+  }
   plugins { vici { socket = unix://$T/charon.vici } }
   port = 0
   port_nat_t = 0
