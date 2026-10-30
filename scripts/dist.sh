@@ -74,7 +74,10 @@ src_line() { printf '  %-13s %-8s sha256 %s\n                %s\n' "$1" "$2" "$3
 {
   echo "sluice-engines build"
   echo
-  echo "source:   $(git -C "$ROOT" remote get-url origin 2>/dev/null || echo "this repository (no remote configured)")"
+  # Public https form of the remote (git@github.com:o/r.git -> https://github.com/o/r)
+  echo "source:   $(git -C "$ROOT" remote get-url origin 2>/dev/null \
+    | sed -E 's#^git@([^:]+):#https://\1/#; s#\.git$##' \
+    || echo "this repository (no remote configured)")"
   echo "commit:   $commit"
   echo "built:    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo
