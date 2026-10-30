@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Download pinned source archives into sources/ and verify sha256.
-# Usage: scripts/fetch.sh [openssl|strongswan ...]   (default: all)
+# Usage: scripts/fetch.sh [target ...]   (default: all)
+# Archives are saved as <name>-<version>.<ext> (tag archives have no name).
 source "$(dirname "$0")/common.sh"
 
 fetch() {
-  local name="$1" url="$2" sha="$3" file
-  file="$SOURCES/$(basename "$url")"
+  local name="$1" version="$2" url="$3" sha="$4" file ext
+  ext="${url##*.tar.}"
+  file="$SOURCES/$name-$version.tar.$ext"
   mkdir -p "$SOURCES"
   if [[ ! -f "$file" ]]; then
     log "download $name: $url"
@@ -23,11 +25,16 @@ fetch() {
 }
 
 targets=("$@")
-[[ ${#targets[@]} -gt 0 ]] || targets=(openssl strongswan)
+[[ ${#targets[@]} -gt 0 ]] || targets=(openssl strongswan openfortivpn m4 autoconf automake pkg-config)
 for t in "${targets[@]}"; do
   case "$t" in
-    openssl)    fetch openssl    "$OPENSSL_URL"    "$OPENSSL_SHA256" ;;
-    strongswan) fetch strongswan "$STRONGSWAN_URL" "$STRONGSWAN_SHA256" ;;
+    openssl)      fetch openssl      "$OPENSSL_VERSION"      "$OPENSSL_URL"      "$OPENSSL_SHA256" ;;
+    strongswan)   fetch strongswan   "$STRONGSWAN_VERSION"   "$STRONGSWAN_URL"   "$STRONGSWAN_SHA256" ;;
+    openfortivpn) fetch openfortivpn "$OPENFORTIVPN_VERSION" "$OPENFORTIVPN_URL" "$OPENFORTIVPN_SHA256" ;;
+    m4)           fetch m4           "$M4_VERSION"           "$M4_URL"           "$M4_SHA256" ;;
+    autoconf)     fetch autoconf     "$AUTOCONF_VERSION"     "$AUTOCONF_URL"     "$AUTOCONF_SHA256" ;;
+    automake)     fetch automake     "$AUTOMAKE_VERSION"     "$AUTOMAKE_URL"     "$AUTOMAKE_SHA256" ;;
+    pkg-config)   fetch pkg-config   "$PKGCONFIG_VERSION"    "$PKGCONFIG_URL"    "$PKGCONFIG_SHA256" ;;
     *) die "unknown target $t" ;;
   esac
 done

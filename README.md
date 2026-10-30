@@ -8,7 +8,7 @@ needed to rebuild the shipped engine binaries from pinned upstream sources is he
 |---|---|---|
 | [OpenSSL](https://www.openssl.org/) | 3.5.9 (LTS) | Apache-2.0 |
 | [strongSwan](https://www.strongswan.org/) (charon, swanctl) | 6.1.0 | GPL-2.0-or-later |
-| [openfortivpn](https://github.com/adrienverge/openfortivpn) | planned | GPL-3.0 |
+| [openfortivpn](https://github.com/adrienverge/openfortivpn) | 1.24.1 | GPL-3.0 (with OpenSSL exception) |
 
 All engines are built as static, universal (arm64 + x86_64) binaries targeting macOS 15+,
 with no Homebrew or other runtime dependencies.
@@ -24,6 +24,8 @@ with no Homebrew or other runtime dependencies.
 scripts/fetch.sh            # download pinned sources, verify sha256
 scripts/build-openssl.sh    # -> build/openssl/universal/{include,lib}
 scripts/build-strongswan.sh # -> build/strongswan/universal/bin/{charon,swanctl}
+scripts/build-tools.sh      # build-only m4/autoconf/automake -> build/tools (needed by the next step)
+scripts/build-openfortivpn.sh # -> build/openfortivpn/universal/bin/openfortivpn
 sudo scripts/smoke-charon.sh  # optional: run charon as root, verify loaded plugins
 ```
 
@@ -42,6 +44,8 @@ instead of changing system DNS itself.
 All paths compiled into the binaries (config files, plugin and module directories)
 point into `/var/empty`; the host app supplies the real configuration at runtime
 via `STRONGSWAN_CONF`. `pkg-config` is not required (a stub in `scripts/` stands in).
+openfortivpn upstream ships only git tag archives, so its `configure` is generated
+with autotools built from pinned GNU sources; no Homebrew is involved.
 
 Pinned versions and checksums live in [`versions.env`](versions.env). A download whose
 sha256 differs from the pinned value aborts the build.
