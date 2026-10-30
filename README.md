@@ -27,6 +27,10 @@ scripts/build-strongswan.sh # -> build/strongswan/universal/bin/{charon,swanctl}
 sudo scripts/smoke-charon.sh  # optional: run charon as root, verify loaded plugins
 ```
 
+Live test against a FortiGate (IKEv2 dial-up, PSK + EAP-MSCHAPv2): copy
+`scripts/connect-test.env.example` outside the repo, fill it in, then
+`sudo scripts/connect-test.sh <env-file> [--arch x86_64] [--hold] [--public-ip]`.
+
 Each build script verifies its output: all architectures present, `minos` 15.0 in
 every object, only system libraries linked, no build-machine paths compiled in.
 

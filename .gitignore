@@ -2,3 +2,6 @@
 /build/
 /dist/
 .DS_Store
+# local credentials for scripts/connect-test.sh
+*.env
+!versions.env
