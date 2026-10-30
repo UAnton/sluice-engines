@@ -30,10 +30,15 @@ done
 GATEWAY= PORT=443 USERNAME= PASSWORD= REALM= TRUSTED_CERT= USER_AGENT=
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-for v in GATEWAY USERNAME PASSWORD; do [[ -n "${!v}" ]] || die "$v not set in $ENV_FILE"; done
+for v in GATEWAY USERNAME; do [[ -n "${!v}" ]] || die "$v not set in $ENV_FILE"; done
 # Placeholders from connect-test-sslvpn.env.example
 [[ "$GATEWAY" != vpn.example.com && "$PASSWORD" != ... ]] \
-  || die "$ENV_FILE still has example values: fill in GATEWAY, USERNAME, PASSWORD"
+  || die "$ENV_FILE still has example values: fill in GATEWAY, USERNAME, PASSWORD (or leave it empty)"
+# Empty PASSWORD: ask, like openfortivpn does when the config has none.
+if [[ -z "$PASSWORD" ]]; then
+  read -r -s -p "Password for $USERNAME: " PASSWORD </dev/tty; echo
+  [[ -n "$PASSWORD" ]] || die "empty password"
+fi
 # The config file format is one "key = value" per line, no quoting.
 for v in GATEWAY USERNAME PASSWORD REALM TRUSTED_CERT USER_AGENT; do
   [[ "${!v}" != *$'\n'* ]] || die "$v must not contain a newline"
