@@ -32,7 +32,15 @@
  *   domain=<dns domain>      (repeated)
  *
  * The unique id keeps make-before-break reauthentication (two IKE_SAs of the
- * same connection alive at once) from clobbering each other's file.
+ * same connection alive at once) from clobbering each other's file. An IKE_SA
+ * rekeying moves the attributes to the new IKE_SA, and the file with them.
+ *
+ * Split tunneling: the plugin also requests INTERNAL_IP4_SUBNET and
+ * INTERNAL_IP6_SUBNET. Some gateways (FortiGate among them) answer the
+ * client's 0.0.0.0/0 with 0.0.0.0/0 and announce the networks behind them
+ * only as these attributes. If any were received, the remote traffic
+ * selectors of each CHILD_SA of that IKE_SA are narrowed to them, so only
+ * these networks are routed into the tunnel. Without them nothing changes.
  *
  * Settings: charon.plugins.sluice-dns.dir (default IPSEC_PIDDIR "/dns").
  * Built into charon by scripts/build-strongswan.sh.
@@ -78,12 +86,16 @@ typedef struct {
 	linked_list_t *servers;
 	/** DNS domains, char* */
 	linked_list_t *domains;
+	/** networks behind the gateway, traffic_selector_t* */
+	linked_list_t *subnets;
 } entry_t;
 
 static void entry_destroy(entry_t *this)
 {
 	this->servers->destroy_offset(this->servers, offsetof(host_t, destroy));
 	this->domains->destroy_function(this->domains, free);
+	this->subnets->destroy_offset(this->subnets,
+								  offsetof(traffic_selector_t, destroy));
 	free(this->name);
 	free(this);
 }
@@ -97,6 +109,9 @@ struct private_handler_t {
 
 	/** implements attribute_handler_t */
 	attribute_handler_t handler;
+
+	/** narrows traffic selectors, follows IKE_SA rekeying */
+	listener_t listener;
 
 	/** directory for published files */
 	char *dir;
@@ -148,6 +163,56 @@ static char *parse_domain(chunk_t data)
 		}
 	}
 	return strndup((char*)data.ptr, data.len);
+}
+
+/**
+ * Parse an INTERNAL_IP4_SUBNET (address and netmask) or INTERNAL_IP6_SUBNET
+ * (address and prefix length) value, NULL if malformed
+ */
+static traffic_selector_t *parse_subnet(int family, chunk_t data)
+{
+	host_t *net;
+	uint32_t mask;
+	int bits;
+
+	if (family == AF_INET)
+	{
+		if (data.len != 8)
+		{
+			return NULL;
+		}
+		mask = untoh32(data.ptr + 4);
+		if (~mask & (~mask + 1))
+		{	/* not a contiguous netmask */
+			return NULL;
+		}
+		bits = __builtin_popcount(mask);
+		data.len = 4;
+	}
+	else
+	{
+		if (data.len != 17 || data.ptr[16] > 128)
+		{
+			return NULL;
+		}
+		bits = data.ptr[16];
+		data.len = 16;
+	}
+	net = host_create_from_chunk(family, data, 0);
+	if (!net)
+	{
+		return NULL;
+	}
+	return traffic_selector_create_from_subnet(net, bits, 0, 0, 65535);
+}
+
+/**
+ * Whether the entry has anything for the DNS file
+ */
+static bool has_dns(entry_t *entry)
+{
+	return entry->servers->get_count(entry->servers) ||
+		   entry->domains->get_count(entry->domains);
 }
 
 /**
@@ -244,6 +309,24 @@ static void write_entry(private_handler_t *this, entry_t *entry)
 }
 
 /**
+ * Write the file of an entry, or remove it if there is no DNS left
+ */
+static void publish_entry(private_handler_t *this, entry_t *entry)
+{
+	char path[PATH_MAX];
+
+	if (has_dns(entry))
+	{
+		write_entry(this, entry);
+	}
+	else
+	{
+		entry_path(this, entry, path, sizeof(path), FALSE);
+		unlink(path);
+	}
+}
+
+/**
  * Find the entry of an IKE_SA, optionally creating it
  */
 static entry_t *get_entry(private_handler_t *this, ike_sa_t *ike_sa,
@@ -272,6 +355,7 @@ static entry_t *get_entry(private_handler_t *this, ike_sa_t *ike_sa,
 			.name = sanitize_name(ike_sa->get_name(ike_sa)),
 			.servers = linked_list_create(),
 			.domains = linked_list_create(),
+			.subnets = linked_list_create(),
 		);
 		this->entries->insert_last(this->entries, found);
 	}
@@ -285,6 +369,7 @@ METHOD(attribute_handler_t, handle, bool,
 	entry_t *entry;
 	host_t *host = NULL;
 	char *domain = NULL;
+	traffic_selector_t *subnet = NULL;
 
 	switch (type)
 	{
@@ -297,6 +382,12 @@ METHOD(attribute_handler_t, handle, bool,
 		case INTERNAL_DNS_DOMAIN:
 			domain = parse_domain(data);
 			break;
+		case INTERNAL_IP4_SUBNET:
+			subnet = parse_subnet(AF_INET, data);
+			break;
+		case INTERNAL_IP6_SUBNET:
+			subnet = parse_subnet(AF_INET6, data);
+			break;
 		default:
 			return FALSE;
 	}
@@ -305,7 +396,7 @@ METHOD(attribute_handler_t, handle, bool,
 		host->destroy(host);
 		host = NULL;
 	}
-	if (!host && !domain)
+	if (!host && !domain && !subnet)
 	{
 		DBG1(DBG_CFG, "sluice-dns: ignoring invalid %N attribute",
 			 configuration_attribute_type_names, type);
@@ -318,14 +409,20 @@ METHOD(attribute_handler_t, handle, bool,
 	{
 		DBG1(DBG_CFG, "sluice-dns: DNS server %H for '%s'", host, entry->name);
 		entry->servers->insert_last(entry->servers, host);
+		write_entry(this, entry);
 	}
-	else
+	else if (domain)
 	{
 		DBG1(DBG_CFG, "sluice-dns: DNS domain %s for '%s'", domain,
 			 entry->name);
 		entry->domains->insert_last(entry->domains, domain);
+		write_entry(this, entry);
 	}
-	write_entry(this, entry);
+	else
+	{
+		DBG1(DBG_CFG, "sluice-dns: network %R for '%s'", subnet, entry->name);
+		entry->subnets->insert_last(entry->subnets, subnet);
+	}
 	this->mutex->unlock(this->mutex);
 	return TRUE;
 }
@@ -337,7 +434,8 @@ METHOD(attribute_handler_t, release, void,
 	enumerator_t *enumerator;
 	entry_t *entry;
 	host_t *host = NULL, *current;
-	char *domain = NULL, *cur_domain, path[PATH_MAX];
+	char *domain = NULL, *cur_domain;
+	traffic_selector_t *subnet = NULL, *cur_subnet;
 
 	switch (type)
 	{
@@ -349,6 +447,12 @@ METHOD(attribute_handler_t, release, void,
 			break;
 		case INTERNAL_DNS_DOMAIN:
 			domain = parse_domain(data);
+			break;
+		case INTERNAL_IP4_SUBNET:
+			subnet = parse_subnet(AF_INET, data);
+			break;
+		case INTERNAL_IP6_SUBNET:
+			subnet = parse_subnet(AF_INET6, data);
 			break;
 		default:
 			return;
@@ -384,26 +488,38 @@ METHOD(attribute_handler_t, release, void,
 		}
 		enumerator->destroy(enumerator);
 	}
-	if (entry)
+	if (entry && subnet)
 	{
-		if (entry->servers->get_count(entry->servers) ||
-			entry->domains->get_count(entry->domains))
+		enumerator = entry->subnets->create_enumerator(entry->subnets);
+		while (enumerator->enumerate(enumerator, &cur_subnet))
 		{
-			write_entry(this, entry);
+			if (cur_subnet->equals(cur_subnet, subnet))
+			{
+				entry->subnets->remove_at(entry->subnets, enumerator);
+				cur_subnet->destroy(cur_subnet);
+				break;
+			}
 		}
-		else
+		enumerator->destroy(enumerator);
+	}
+	if (entry && (host || domain))
+	{
+		publish_entry(this, entry);
+		if (!has_dns(entry))
 		{
-			entry_path(this, entry, path, sizeof(path), FALSE);
-			unlink(path);
 			DBG1(DBG_CFG, "sluice-dns: removed DNS for '%s'", entry->name);
-			this->entries->remove(this->entries, entry, NULL);
-			entry_destroy(entry);
 		}
+	}
+	if (entry && !has_dns(entry) && !entry->subnets->get_count(entry->subnets))
+	{
+		this->entries->remove(this->entries, entry, NULL);
+		entry_destroy(entry);
 	}
 	this->mutex->unlock(this->mutex);
 
 	DESTROY_IF(host);
 	free(domain);
+	DESTROY_IF(subnet);
 }
 
 /**
@@ -411,7 +527,7 @@ METHOD(attribute_handler_t, release, void,
  */
 typedef struct {
 	enumerator_t public;
-	configuration_attribute_type_t types[3];
+	configuration_attribute_type_t types[5];
 	int count;
 	int pos;
 } attribute_enumerator_t;
@@ -466,16 +582,127 @@ METHOD(attribute_handler_t, create_attribute_enumerator, enumerator_t*,
 	if (has_family(vips, AF_INET))
 	{
 		enumerator->types[enumerator->count++] = INTERNAL_IP4_DNS;
+		enumerator->types[enumerator->count++] = INTERNAL_IP4_SUBNET;
 	}
 	if (has_family(vips, AF_INET6))
 	{
 		enumerator->types[enumerator->count++] = INTERNAL_IP6_DNS;
+		enumerator->types[enumerator->count++] = INTERNAL_IP6_SUBNET;
 	}
 	if (enumerator->count)
 	{
 		enumerator->types[enumerator->count++] = INTERNAL_DNS_DOMAIN;
 	}
 	return &enumerator->public;
+}
+
+/**
+ * Replace the remote traffic selectors with their intersections with the
+ * received networks. Left as is if none of the networks falls within them.
+ */
+static void narrow_remote(entry_t *entry, linked_list_t *remote)
+{
+	enumerator_t *enumerator, *subnets;
+	traffic_selector_t *ts, *subnet, *subset;
+	linked_list_t *narrowed;
+
+	narrowed = linked_list_create();
+	enumerator = remote->create_enumerator(remote);
+	while (enumerator->enumerate(enumerator, &ts))
+	{
+		subnets = entry->subnets->create_enumerator(entry->subnets);
+		while (subnets->enumerate(subnets, &subnet))
+		{
+			subset = subnet->get_subset(subnet, ts);
+			if (subset)
+			{
+				narrowed->insert_last(narrowed, subset);
+			}
+		}
+		subnets->destroy(subnets);
+	}
+	enumerator->destroy(enumerator);
+
+	if (!narrowed->get_count(narrowed))
+	{
+		DBG1(DBG_CFG, "sluice-dns: no network of '%s' within %#R, not narrowed",
+			 entry->name, remote);
+		narrowed->destroy(narrowed);
+		return;
+	}
+	while (remote->remove_first(remote, (void**)&ts) == SUCCESS)
+	{
+		ts->destroy(ts);
+	}
+	while (narrowed->remove_first(narrowed, (void**)&ts) == SUCCESS)
+	{
+		remote->insert_last(remote, ts);
+	}
+	narrowed->destroy(narrowed);
+	DBG1(DBG_CFG, "sluice-dns: narrowed CHILD_SA of '%s' to %#R", entry->name,
+		 remote);
+}
+
+/**
+ * The handler of the embedded listener the bus calls us with
+ */
+static private_handler_t *from_listener(listener_t *listener)
+{
+	return (private_handler_t*)((char*)listener -
+								offsetof(private_handler_t, listener));
+}
+
+METHOD(listener_t, narrow, bool,
+	listener_t *listener, ike_sa_t *ike_sa, child_sa_t *child_sa,
+	narrow_hook_t type, linked_list_t *local, linked_list_t *remote)
+{
+	private_handler_t *this = from_listener(listener);
+	entry_t *entry;
+
+	if (ike_sa->get_version(ike_sa) != IKEV2)
+	{
+		return TRUE;
+	}
+	switch (type)
+	{
+		/* after the gateway answered our proposal, or when it rekeys a
+		 * CHILD_SA, which may restore what it answered at first */
+		case NARROW_INITIATOR_POST_NOAUTH:
+		case NARROW_INITIATOR_POST_AUTH:
+		case NARROW_RESPONDER:
+			break;
+		default:
+			return TRUE;
+	}
+	this->mutex->lock(this->mutex);
+	entry = get_entry(this, ike_sa, FALSE);
+	if (entry && entry->subnets->get_count(entry->subnets))
+	{
+		narrow_remote(entry, remote);
+	}
+	this->mutex->unlock(this->mutex);
+	return TRUE;
+}
+
+METHOD(listener_t, ike_rekey, bool,
+	listener_t *listener, ike_sa_t *old, ike_sa_t *new)
+{
+	private_handler_t *this = from_listener(listener);
+	char path[PATH_MAX];
+	entry_t *entry;
+
+	/* the attributes move to the new IKE_SA, which has another unique id */
+	this->mutex->lock(this->mutex);
+	entry = get_entry(this, old, FALSE);
+	if (entry)
+	{
+		entry_path(this, entry, path, sizeof(path), FALSE);
+		unlink(path);
+		entry->id = new->get_unique_id(new);
+		publish_entry(this, entry);
+	}
+	this->mutex->unlock(this->mutex);
+	return TRUE;
 }
 
 /**
@@ -530,6 +757,10 @@ static private_handler_t *handler_create()
 			.release = _release,
 			.create_attribute_enumerator = _create_attribute_enumerator,
 		},
+		.listener = {
+			.narrow = _narrow,
+			.ike_rekey = _ike_rekey,
+		},
 		.dir = lib->settings->get_str(lib->settings,
 							"%s.plugins.sluice-dns.dir", DEFAULT_DIR, lib->ns),
 		.mutex = mutex_create(MUTEX_TYPE_DEFAULT),
@@ -559,9 +790,11 @@ static bool plugin_cb(private_plugin_t *this, plugin_feature_t *feature,
 		clean_dir(this->handler);
 		charon->attributes->add_handler(charon->attributes,
 										&this->handler->handler);
+		charon->bus->add_listener(charon->bus, &this->handler->listener);
 	}
 	else
 	{
+		charon->bus->remove_listener(charon->bus, &this->handler->listener);
 		charon->attributes->remove_handler(charon->attributes,
 										   &this->handler->handler);
 	}

@@ -50,7 +50,11 @@ every object, only system libraries linked, no build-machine paths compiled in.
 charon includes one plugin of our own, [`plugins/sluice-dns`](plugins/sluice-dns/sluice_dns_plugin.c)
 (GPL-2.0-or-later): it requests DNS configuration attributes from the gateway and
 publishes them per IKE_SA as files under `/var/run/sluice/dns/` for the host app,
-instead of changing system DNS itself.
+instead of changing system DNS itself. It also requests the gateway's split-tunnel
+networks (`INTERNAL_IP4_SUBNET`, `INTERNAL_IP6_SUBNET`); when the gateway sends them,
+the CHILD_SA's remote traffic selectors are narrowed to these networks. Some
+gateways (FortiGate among them) answer `0.0.0.0/0` as traffic selector and announce
+their networks only this way; stock strongSwan handles that only for IKEv1 (`unity`).
 
 All paths compiled into the binaries (config files, plugin and module directories)
 point into `/var/empty`; the host app supplies the real configuration at runtime
